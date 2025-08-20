@@ -1,103 +1,240 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEffect, useRef, useState } from "react";
+import { JSONTree } from "react-json-tree";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
+
+export default function App() {
+  const [url, setUrl] = useState("http://numbersapi.com/random/math?json");
+  const [data, setData] = useState(null);
+  const [selected, setSelected] = useState(new Set());
+  const [timeSeries, setTimeSeries] = useState({});
+  const intervalRef = useRef(null);
+  const [interval, setIntervalValue] = useState(1000);
+
+  // Load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("selectedItems");
+    if (saved) setSelected(new Set(JSON.parse(saved)));
+
+    const storedSeries = localStorage.getItem("timeSeries");
+    if (storedSeries) setTimeSeries(JSON.parse(storedSeries));
+  }, []);
+
+  // Save selections
+  useEffect(() => {
+    localStorage.setItem("selectedItems", JSON.stringify([...selected]));
+  }, [selected]);
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
+      const json = await res.json();
+      setData(json);
+
+      // Update time series
+      const stored = JSON.parse(localStorage.getItem("timeSeries") || "{}");
+      selected.forEach((path) => {
+        const keys = path.split(".").filter((k) => k !== "root");
+        const value = keys.reduce(
+          (acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined),
+          json
+        );
+
+        if (value !== undefined && typeof value === "number") {
+          if (!stored[path]) stored[path] = [];
+          stored[path].push({
+            timestamp: new Date().toLocaleTimeString(),
+            value,
+          });
+        }
+      });
+
+      localStorage.setItem("timeSeries", JSON.stringify(stored));
+      setTimeSeries(stored);
+    } catch (e) {
+      console.error("Error fetching JSON:", e);
+      setData({ error: e.message });
+    }
+  };
+
+  const startFetching = () => {
+    fetchData(); // fetch immediately
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (typeof interval === "number" && interval > 0) {
+      intervalRef.current = setInterval(fetchData, interval);
+    }
+  };
+
+  const stopFetching = () => {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  };
+
+  const handleClick = (path) => {
+    setSelected((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(path)) newSet.delete(path);
+      else newSet.add(path);
+      return newSet;
+    });
+  };
+
+  const valueRenderer = (raw, value, ...keyPath) => {
+    const path = keyPath.reverse().join(".");
+    const isSelected = selected.has(path);
+    return (
+      <span
+        onClick={(e) => {
+          e.stopPropagation();
+          handleClick(path);
+        }}
+        className={`cursor-pointer px-1 py-[2px] rounded ${
+          isSelected ? "border border-green-400 bg-gray-950" : "bg-transparent"
+        }`}
+      >
+        {raw}
+      </span>
+    );
+  };
+
+  const myTheme = {
+    base00: "#1e1e1e",
+    base01: "#2e2e2e",
+    base02: "#3e3e3e",
+    base03: "#999999",
+    base04: "#cccccc",
+    base05: "#ffffff",
+    base06: "#ffffff",
+    base07: "#ffffff",
+    base08: "#f44747",
+    base09: "#ff8800",
+    base0A: "#ffcc66",
+    base0B: "#99cc99",
+    base0C: "#66cccc",
+    base0D: "#6699cc",
+    base0E: "#cc99cc",
+    base0F: "#ffffff",
+  };
+
+  // Inside your component
+  const deletePath = (path) => {
+    // Remove from timeSeries
+    const updatedSeries = { ...timeSeries };
+    delete updatedSeries[path];
+    setTimeSeries(updatedSeries);
+    localStorage.setItem("timeSeries", JSON.stringify(updatedSeries));
+
+    // Deselect
+    setSelected((prev) => {
+      const newSet = new Set(prev);
+      newSet.delete(path);
+      localStorage.setItem("selectedItems", JSON.stringify([...newSet]));
+      return newSet;
+    });
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+    <div className="p-5">
+      <div className="w-full flex gap-2 justify-start items-center pb-4">
+        <label className="text-2xl font-bold">URL</label>
+        <Input
+          className="w-1/3"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
         />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.js
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </div>
+      <div className="w-full flex gap-2 justify-start items-center pb-4">
+        <label className="text-lg font-bold">Interval (ms)</label>
+        <Input
+          className="w-32"
+          type="number"
+          value={interval ?? ""}
+          onChange={(e) =>
+            setIntervalValue(
+              Number(e.target.value) < 100 ? 100 : Number(e.target.value)
+            )
+          }
+        />
+        <Button onClick={startFetching}>Start fetch</Button>
+        <Button variant="destructive" onClick={stopFetching}>
+          Stop fetch
+        </Button>
+      </div>
+      <div className="w-full flex gap-2 justify-start items-center pb-4">
+        {data ? (
+          <JSONTree
+            data={data}
+            hideRoot={false}
+            valueRenderer={valueRenderer}
+            theme={myTheme}
+            invertTheme={false}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        ) : (
+          <p>No data loaded yet. Click "Start fetch".</p>
+        )}
+      </div>
+      <div className="w-full flex gap-2 justify-start items-center pb-4">
+        {Object.keys(timeSeries).length === 0 ? (
+          <p>No values tracked yet.</p>
+        ) : (
+          Object.entries(timeSeries).map(([path, entries]) => (
+            <div key={path} className="mb-6 flex flex-col">
+              <div className="flex items-center gap-2">
+                <strong>{path}</strong>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deletePath(path)}
+                >
+                  Delete
+                </Button>
+              </div>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart
+                  data={entries}
+                  margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="timestamp" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="value"
+                    stroke="#82ca9d"
+                    dot={false}
+                    isAnimationActive={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <ScrollArea className="mt-5 py-2 px-5 w-[500px] h-60 bg-accent border-black border rounded-lg shadow shadow-black">
+                <ul className="ml-4 mt-1 list-disc">
+                  {[...entries].reverse().map((entry, idx) => (
+                    <li key={idx}>
+                      {entry.timestamp} → {String(entry.value)}
+                    </li>
+                  ))}
+                </ul>
+              </ScrollArea>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   );
 }
