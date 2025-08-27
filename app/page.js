@@ -57,24 +57,6 @@ export default function App() {
     });
   };
 
-  // Load from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem("selectedItems");
-    if (saved) setSelected(new Set(JSON.parse(saved)));
-
-    const storedSeries = localStorage.getItem("timeSeries");
-    if (storedSeries) setTimeSeries(JSON.parse(storedSeries));
-  }, []);
-
-  // Save selections
-  useEffect(() => {
-    localStorage.setItem("selectedItems", JSON.stringify([...selected]));
-  }, [selected]);
-
-  useEffect(() => {
-    fetchData();
-  }, [url]);
-
   const fetchData = async () => {
     try {
       const res = await fetch(url);
@@ -183,6 +165,24 @@ export default function App() {
     });
   };
 
+  // Load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem("selectedItems");
+    if (saved) setSelected(new Set(JSON.parse(saved)));
+
+    const storedSeries = localStorage.getItem("timeSeries");
+    if (storedSeries) setTimeSeries(JSON.parse(storedSeries));
+  }, []);
+
+  // Save selections
+  useEffect(() => {
+    localStorage.setItem("selectedItems", JSON.stringify([...selected]));
+  }, [selected]);
+
+  useEffect(() => {
+    fetchData();
+  }, [url]);
+
   return (
     <div className="p-5">
       <div className="w-full flex gap-2 justify-start items-center pb-4">
@@ -227,7 +227,7 @@ export default function App() {
             />
           </div>
         ) : (
-          <p>No data loaded yet. Click "Start fetch".</p>
+          <p>No data loaded yet. Click Start fetch.</p>
         )}
       </div>
       <div className="w-full flex-col gap-2 justify-start items-center pb-4">
